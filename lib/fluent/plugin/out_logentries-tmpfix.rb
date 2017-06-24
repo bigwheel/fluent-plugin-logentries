@@ -17,6 +17,7 @@ class Fluent::LogentriesOutput < Fluent::BufferedOutput
   config_param :tag_access_log, :string,  :default => 'logs-access'
   config_param :tag_error_log,  :string,  :default => 'logs-error'
   config_param :default_token,  :string,  :default => nil
+  config_param :hostname_key,   :string,  :default => nil
 
   SSL_HOST    = "api.logentries.com"
   NO_SSL_HOST = "data.logentries.com"
@@ -121,18 +122,18 @@ class Fluent::LogentriesOutput < Fluent::BufferedOutput
 
       # Clean up the string to avoid blank line in logentries
       message = @use_json ? record.to_json : record["message"].rstrip()
-      send_logentries(token, message)
+      send_logentries(token, message, record["hostname"] || HOSTNAME)
     end
   end
 
-  def send_logentries(token, data)
+  def send_logentries(token, data, hostname)
     retries = 0
     begin
-      client.write("#{token} #{HOSTNAME} #{data} \n")
+      client.write("#{token} #{hostname} #{data} \n")
     rescue Errno::EMSGSIZE
       str_length = data.length
-      send_logentries(token, data[0..str_length/2])
-      send_logentries(token, data[(str_length/2)+1..str_length])
+      send_logentries(token, data[0..str_length/2], hostname)
+      send_logentries(token, data[(str_length/2)+1..str_length], hostname)
 
       log.warn "Message Too Long, re-sending it in two part..."
     rescue => e
